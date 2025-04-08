@@ -1,0 +1,21 @@
+# Ignore virtual environment
+venv/
+
+# Ignore cache files
+cache/
+
+# Ignore logs
+processing.log
+
+# Ignore compiled Python files
+__pycache__/
+
+# Ignore processed data
+data/processed/
+
+# Ignore raw and processed GeoJSON files
+data/raw/*.geojson
+data/processed/*.geojson
+
+# Ignore macOS system files
+.DS_Store
