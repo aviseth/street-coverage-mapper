@@ -12,6 +12,7 @@ __pycache__/
 
 # Ignore processed data
 data/processed/
+Data/raw/
 
 # Ignore raw and processed GeoJSON files
 data/raw/*.geojson
