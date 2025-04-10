@@ -17,6 +17,7 @@ Data/raw/
 # Ignore raw and processed GeoJSON files
 data/raw/*.geojson
 data/processed/*.geojson
+data/raw/*.tcs
 
 # Ignore macOS system files
 .DS_Store
