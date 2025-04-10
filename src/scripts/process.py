@@ -8,7 +8,7 @@ from pathlib import Path
 import geopandas as gpd
 from ..data.walk_processor import process_walk_files, analyze_walks
 from ..data.street_loader import load_street_network
-from ..utils.config import RAW_DATA_DIR, PROCESSED_DATA_DIR
+from ..utils.config import RAW_DATA_DIR, PROCESSED_DATA_DIR, METRIC_CRS
 
 def main():
     """Main function to process walks and generate coverage maps."""
@@ -51,7 +51,11 @@ def main():
     print("\nCoverage Summary:")
     print(f"Total streets: {total_streets}")
     print(f"Covered streets: {len(covered_streets)} ({coverage_percent:.1f}%)")
-    print(f"Total walk distance: {valid_walks.geometry.length.sum() / 1000:.1f} km")
+    
+    # Calculate total walk distance in metric CRS
+    valid_walks_metric = valid_walks.to_crs(METRIC_CRS)
+    total_distance_km = valid_walks_metric.geometry.length.sum() / 1000
+    print(f"Total walk distance: {total_distance_km:.1f} km")
 
 if __name__ == '__main__':
     main() 
