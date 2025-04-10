@@ -4,30 +4,39 @@ Load and process street network data.
 import os
 import geopandas as gpd
 import osmnx as ox
-from ..utils.config import PROCESSED_DATA_DIR, DEFAULT_CRS
+from ..utils.config import PROCESSED_DATA_DIR, DEFAULT_CRS, CITY_PARAMS
 import pandas as pd
 
-def load_street_network():
-    """Load or download street network for New York City."""
-    cache_file = os.path.join(PROCESSED_DATA_DIR, "nyc_streets.geojson")
+def load_street_network(city: str = 'new_york'):
+    """Load or download street network for the specified city."""
+    if city not in CITY_PARAMS:
+        raise ValueError(f"Unsupported city: {city}. Must be one of {list(CITY_PARAMS.keys())}")
+    
+    params = CITY_PARAMS[city]
+    cache_file = os.path.join(PROCESSED_DATA_DIR, f"{city}_streets.geojson")
     
     # Check if we have a cached version
     if os.path.exists(cache_file):
         print(f"Loading streets from cache: {cache_file}")
         return gpd.read_file(cache_file)
     
-    # Define areas to load
-    areas = [
-        "Manhattan, New York, USA",
-        "Brooklyn, New York, USA",
-        "Queens, New York, USA",
-        "Staten Island, New York, USA",
-        "Bronx, New York, USA",
-        "Jersey City, New Jersey, USA",
-        "Hoboken, New Jersey, USA"
-    ]
+    print(f"Downloading street network for {city}...")
     
-    print("Downloading street networks for NYC metro area...")
+    if city == 'new_york':
+        # Define areas to load for NYC
+        areas = [
+            "Manhattan, New York, USA",
+            "Brooklyn, New York, USA",
+            "Queens, New York, USA",
+            "Staten Island, New York, USA",
+            "Bronx, New York, USA",
+            "Jersey City, New Jersey, USA",
+            "Hoboken, New Jersey, USA"
+        ]
+    else:  # London
+        # Use boroughs from config
+        areas = [f"{borough}, London, UK" for borough in params['boroughs']]
+    
     all_streets = []
     
     for area in areas:
@@ -60,5 +69,4 @@ def load_street_network():
     os.makedirs(os.path.dirname(cache_file), exist_ok=True)
     streets_gdf.to_file(cache_file, driver='GeoJSON')
     
-    print(f"Saved street network to {cache_file}")
     return streets_gdf 

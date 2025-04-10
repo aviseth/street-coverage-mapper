@@ -95,11 +95,13 @@ def process_walk_files(directory: str) -> gpd.GeoDataFrame:
     print(f"Processed {len(gdf)} valid walks")
     return gdf
 
-def analyze_walks(walks_gdf: gpd.GeoDataFrame, streets_gdf: gpd.GeoDataFrame) -> Dict:
+def analyze_walks(walks_gdf: gpd.GeoDataFrame, streets_gdf: gpd.GeoDataFrame, city: str = 'new_york') -> Dict:
     """Analyze walks and calculate street coverage using optimized spatial operations."""
     from ..utils.config import CITY_PARAMS
     
-    city = 'new_york'
+    if city not in CITY_PARAMS:
+        raise ValueError(f"Unsupported city: {city}. Must be one of {list(CITY_PARAMS.keys())}")
+    
     params = CITY_PARAMS[city]
     
     # Filter out transit trips from walks
@@ -123,14 +125,13 @@ def analyze_walks(walks_gdf: gpd.GeoDataFrame, streets_gdf: gpd.GeoDataFrame) ->
         straight_distance = start_point.distance(end_point)
         sinuosity = distance / straight_distance if straight_distance > 0 else 1
         
-        # Only include clear walking segments:
-        # 1. Speed within walking range
-        # 2. Natural path sinuosity
-        # 3. Reasonable walking distance
-        if (avg_speed <= params['max_walking_speed'] * 1.2 and  # Allow 20% buffer
-            avg_speed >= params['min_walking_speed'] and  # Minimum walking speed
-            (sinuosity >= 1.05 or distance <= 2000) and  # Allow straight paths only for short distances
-            distance <= 5000):  # Maximum realistic walking distance of 5 km
+        # More lenient criteria for valid walks:
+        # 1. Speed within reasonable walking range (with larger buffer)
+        # 2. Allow straight paths for any distance (GPS can be inaccurate)
+        # 3. Only filter out extremely long distances
+        if (avg_speed <= params['max_walking_speed'] * 1.5 and  # Allow 50% buffer for speed
+            avg_speed >= params['min_walking_speed'] * 0.5 and  # Allow slower walking
+            distance <= 10000):  # Maximum realistic walking distance of 10 km
             valid_walks.append(walk)
     
     valid_walks_gdf = gpd.GeoDataFrame(valid_walks, crs=walks_gdf.crs)
@@ -140,7 +141,6 @@ def analyze_walks(walks_gdf: gpd.GeoDataFrame, streets_gdf: gpd.GeoDataFrame) ->
     streets_gdf = streets_gdf.copy()
     streets_gdf['covered'] = False
     streets_gdf['coverage_percent'] = 0.0
-    streets_gdf['covered_segments'] = None  # To store individual covered segments
     
     # Convert to metric CRS for accurate buffering and distance calculations
     valid_walks_gdf = valid_walks_gdf.to_crs(METRIC_CRS)
@@ -182,39 +182,21 @@ def analyze_walks(walks_gdf: gpd.GeoDataFrame, streets_gdf: gpd.GeoDataFrame) ->
             intersecting_walks = relevant_walks[relevant_walks.intersects(street.geometry)]
             
             if not intersecting_walks.empty:
-                # Calculate intersections and filter out potential transit segments
-                covered_segments = []
-                total_covered_length = 0
-                
+                # Calculate total covered length
+                covered_length = 0
                 for _, walk in intersecting_walks.iterrows():
                     intersection = street.geometry.intersection(walk.geometry)
                     if not intersection.is_empty:
-                        # For each covered segment, check if it's likely a transit segment
-                        if hasattr(intersection, 'geoms'):
-                            # Multiple segments
-                            for segment in intersection.geoms:
-                                if segment.length > 0:
-                                    segment_length = segment.length
-                                    # Only include segments that are likely walking
-                                    if segment_length <= 500:  # Max 500m per segment
-                                        covered_segments.append(segment)
-                                        total_covered_length += segment_length
-                        else:
-                            # Single segment
-                            segment_length = intersection.length
-                            if segment_length > 0 and segment_length <= 500:
-                                covered_segments.append(intersection)
-                                total_covered_length += segment_length
+                        covered_length += intersection.length
                 
-                if covered_segments:
-                    # Calculate coverage percentage
-                    if street.geometry.length > 0:
-                        coverage_percent = (total_covered_length / street.geometry.length) * 100
-                        if coverage_percent > 0:
-                            street_data = street.copy()
-                            street_data['coverage_percent'] = min(coverage_percent, 100)
-                            street_data['covered'] = True
-                            covered_streets.append(street_data)
+                # Calculate coverage percentage
+                if street.geometry.length > 0:
+                    coverage_percent = (covered_length / street.geometry.length) * 100
+                    if coverage_percent > 0:
+                        street_data = street.copy()
+                        street_data['coverage_percent'] = min(coverage_percent, 100)
+                        street_data['covered'] = True
+                        covered_streets.append(street_data)
     
     # Create final GeoDataFrame with only covered streets
     if covered_streets:
