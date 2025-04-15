@@ -54,9 +54,9 @@ pip install -r requirements.txt
    - Copy all `.tcx` files from your Google Takeout export to the `data/raw/` directory
 
 4. **Run the analysis**:
-   - Execute the main processing script:
+   - Execute the main processing script (you can only choose one city at once, aso of now):
      ```bash
-     python -m src.scripts.process --city [london|new_york]
+     python -m src.scripts.process --city [london or new_york]
      ```
    - This will generate:
      - `processed_walks_[city].geojson`: Your walking routes
