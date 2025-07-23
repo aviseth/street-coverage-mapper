@@ -1,0 +1,1 @@
+"""Street Coverage Mapper - Track and visualize your urban walking coverage."""

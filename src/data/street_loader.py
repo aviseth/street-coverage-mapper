@@ -6,8 +6,12 @@ import geopandas as gpd
 import osmnx as ox
 from ..utils.config import PROCESSED_DATA_DIR, DEFAULT_CRS, CITY_PARAMS
 import pandas as pd
+import logging
+from ..utils.logging_config import setup_logging
 
-def load_street_network(city: str = 'new_york'):
+logger = setup_logging()
+
+def load_street_network(city: str = 'new_york') -> gpd.GeoDataFrame:
     """Load or download street network for the specified city."""
     if city not in CITY_PARAMS:
         raise ValueError(f"Unsupported city: {city}. Must be one of {list(CITY_PARAMS.keys())}")
@@ -17,10 +21,10 @@ def load_street_network(city: str = 'new_york'):
     
     # Check if we have a cached version
     if os.path.exists(cache_file):
-        print(f"Loading streets from cache: {cache_file}")
+        logger.info(f"Loading streets from cache: {cache_file}")
         return gpd.read_file(cache_file)
     
-    print(f"Downloading street network for {city}...")
+    logger.info(f"Downloading street network for {city}...")
     
     if city == 'new_york':
         # Define areas to load for NYC
@@ -40,7 +44,7 @@ def load_street_network(city: str = 'new_york'):
     all_streets = []
     
     for area in areas:
-        print(f"Loading streets for {area}...")
+        logger.info(f"Loading streets for {area}...")
         try:
             # Download street network
             G = ox.graph_from_place(area, network_type='drive')
@@ -49,10 +53,10 @@ def load_street_network(city: str = 'new_york'):
             streets_gdf = ox.graph_to_gdfs(G, nodes=False, edges=True)
             all_streets.append(streets_gdf)
         except Exception as e:
-            print(f"Error loading streets for {area}: {e}")
+            logger.error(f"Error loading streets for {area}: {e}")
     
     if not all_streets:
-        print("No street networks could be loaded")
+        logger.error("No street networks could be loaded")
         return gpd.GeoDataFrame(geometry=[], crs=DEFAULT_CRS)
     
     # Combine all street networks
@@ -68,5 +72,6 @@ def load_street_network(city: str = 'new_york'):
     # Save to file
     os.makedirs(os.path.dirname(cache_file), exist_ok=True)
     streets_gdf.to_file(cache_file, driver='GeoJSON')
+    logger.info(f"Saved {len(streets_gdf)} streets to cache: {cache_file}")
     
     return streets_gdf 

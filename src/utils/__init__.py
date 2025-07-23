@@ -1,0 +1,1 @@
+"""Utilities and configuration for street coverage mapper."""
