@@ -6,6 +6,8 @@ cache/
 
 # Ignore logs
 processing.log
+logs/
+*.log
 
 # Ignore compiled Python files
 __pycache__/

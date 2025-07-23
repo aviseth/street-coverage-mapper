@@ -7,11 +7,15 @@ from shapely.geometry import LineString, Point
 import pandas as pd
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 import pytz
+import logging
 from ..utils.config import DEFAULT_CRS, MIN_WALK_DURATION, MIN_WALK_DISTANCE, METRIC_CRS
+from ..utils.logging_config import setup_logging
 
-def parse_tcx_file(file_path: str) -> Optional[Dict]:
+logger = setup_logging()
+
+def parse_tcx_file(file_path: str) -> Optional[Dict[str, any]]:
     """Parse a TCX file and extract walk data."""
     try:
         tree = ET.parse(file_path)
@@ -60,8 +64,14 @@ def parse_tcx_file(file_path: str) -> Optional[Dict]:
             'source_file': Path(file_path).name
         }
         
+    except ET.ParseError as e:
+        logger.error(f"XML parsing error in TCX file {file_path}: {e}")
+        return None
+    except ValueError as e:
+        logger.error(f"Value error parsing TCX file {file_path}: {e}")
+        return None
     except Exception as e:
-        print(f"Error parsing TCX file {file_path}: {e}")
+        logger.error(f"Unexpected error parsing TCX file {file_path}: {e}")
         return None
 
 def process_walk_files(directory: str) -> gpd.GeoDataFrame:
@@ -69,7 +79,7 @@ def process_walk_files(directory: str) -> gpd.GeoDataFrame:
     walks = []
     tcx_files = list(Path(directory).glob('*.tcx'))
     
-    print(f"Found {len(tcx_files)} TCX files")
+    logger.info(f"Found {len(tcx_files)} TCX files")
     
     for file_path in tcx_files:
         walk_data = parse_tcx_file(str(file_path))
@@ -92,10 +102,10 @@ def process_walk_files(directory: str) -> gpd.GeoDataFrame:
     # Create GeoDataFrame
     gdf = gpd.GeoDataFrame(walks, crs=DEFAULT_CRS)
     
-    print(f"Processed {len(gdf)} valid walks")
+    logger.info(f"Processed {len(gdf)} valid walks")
     return gdf
 
-def analyze_walks(walks_gdf: gpd.GeoDataFrame, streets_gdf: gpd.GeoDataFrame, city: str = 'new_york') -> Dict:
+def analyze_walks(walks_gdf: gpd.GeoDataFrame, streets_gdf: gpd.GeoDataFrame, city: str = 'new_york') -> Tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     """Analyze walks and calculate street coverage using optimized spatial operations."""
     from ..utils.config import CITY_PARAMS
     
@@ -135,7 +145,7 @@ def analyze_walks(walks_gdf: gpd.GeoDataFrame, streets_gdf: gpd.GeoDataFrame, ci
             valid_walks.append(walk)
     
     valid_walks_gdf = gpd.GeoDataFrame(valid_walks, crs=walks_gdf.crs)
-    print(f"Found {len(valid_walks_gdf)} valid walks out of {len(walks_gdf)} total walks")
+    logger.info(f"Found {len(valid_walks_gdf)} valid walks out of {len(walks_gdf)} total walks")
     
     # Create a copy of streets for results
     streets_gdf = streets_gdf.copy()
@@ -157,8 +167,12 @@ def analyze_walks(walks_gdf: gpd.GeoDataFrame, streets_gdf: gpd.GeoDataFrame, ci
     # Process streets in larger batches for better performance
     batch_size = 5000
     covered_streets = []
+    total_batches = (len(streets_gdf) + batch_size - 1) // batch_size
+    logger.info(f"Processing {len(streets_gdf)} streets in {total_batches} batches")
     
-    for i in range(0, len(streets_gdf), batch_size):
+    for batch_num, i in enumerate(range(0, len(streets_gdf), batch_size), 1):
+        if batch_num % 10 == 0:
+            logger.info(f"Processing batch {batch_num}/{total_batches}")
         batch_streets = streets_gdf.iloc[i:i+batch_size]
         
         # Find all potentially intersecting walks for the entire batch
@@ -207,5 +221,7 @@ def analyze_walks(walks_gdf: gpd.GeoDataFrame, streets_gdf: gpd.GeoDataFrame, ci
     # Convert back to original CRS
     result_streets = result_streets.to_crs(walks_gdf.crs)
     valid_walks_gdf = valid_walks_gdf.to_crs(walks_gdf.crs)
+    
+    logger.info(f"Found {len(result_streets)} covered streets")
     
     return result_streets, valid_walks_gdf 
