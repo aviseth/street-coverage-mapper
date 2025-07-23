@@ -134,7 +134,10 @@ def analyze_walks(walks_gdf: gpd.GeoDataFrame, streets_gdf: gpd.GeoDataFrame, ci
             distance <= 10000):  # Maximum realistic walking distance of 10 km
             valid_walks.append(walk)
     
-    valid_walks_gdf = gpd.GeoDataFrame(valid_walks, crs=walks_gdf.crs)
+    if valid_walks:
+        valid_walks_gdf = gpd.GeoDataFrame(valid_walks, crs=walks_gdf.crs)
+    else:
+        valid_walks_gdf = gpd.GeoDataFrame(geometry=[], crs=walks_gdf.crs)
     print(f"Found {len(valid_walks_gdf)} valid walks out of {len(walks_gdf)} total walks")
     
     # Create a copy of streets for results
@@ -156,8 +159,7 @@ def analyze_walks(walks_gdf: gpd.GeoDataFrame, streets_gdf: gpd.GeoDataFrame, ci
     
     # Process streets in larger batches for better performance
     batch_size = 5000
-    covered_streets = []
-    
+
     for i in range(0, len(streets_gdf), batch_size):
         batch_streets = streets_gdf.iloc[i:i+batch_size]
         
@@ -193,16 +195,11 @@ def analyze_walks(walks_gdf: gpd.GeoDataFrame, streets_gdf: gpd.GeoDataFrame, ci
                 if street.geometry.length > 0:
                     coverage_percent = (covered_length / street.geometry.length) * 100
                     if coverage_percent > 0:
-                        street_data = street.copy()
-                        street_data['coverage_percent'] = min(coverage_percent, 100)
-                        street_data['covered'] = True
-                        covered_streets.append(street_data)
+                        streets_gdf.at[idx, 'coverage_percent'] = min(coverage_percent, 100)
+                        streets_gdf.at[idx, 'covered'] = True
     
-    # Create final GeoDataFrame with only covered streets
-    if covered_streets:
-        result_streets = gpd.GeoDataFrame(covered_streets, crs=METRIC_CRS)
-    else:
-        result_streets = gpd.GeoDataFrame(geometry=[], crs=METRIC_CRS)
+    # Use the updated street dataframe with coverage info
+    result_streets = streets_gdf
     
     # Convert back to original CRS
     result_streets = result_streets.to_crs(walks_gdf.crs)
