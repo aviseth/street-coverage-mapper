@@ -18,3 +18,6 @@ data/processed/**/*.geojson
 
 # Ignore macOS system files
 .DS_Store
+
+# Ignore test files
+test_*.py
