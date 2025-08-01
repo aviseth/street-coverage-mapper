@@ -95,14 +95,12 @@ def process_walk_files(directory: str) -> gpd.GeoDataFrame:
     print(f"Processed {len(gdf)} valid walks")
     return gdf
 
-def analyze_walks(walks_gdf: gpd.GeoDataFrame, streets_gdf: gpd.GeoDataFrame, city: str = 'new_york') -> Dict:
+def analyze_walks(walks_gdf: gpd.GeoDataFrame, streets_gdf: gpd.GeoDataFrame, city: str) -> Dict:
     """Analyze walks and calculate street coverage using optimized spatial operations."""
-    from ..utils.config import CITY_PARAMS
+    from ..utils.config import get_city_parameters
     
-    if city not in CITY_PARAMS:
-        raise ValueError(f"Unsupported city: {city}. Must be one of {list(CITY_PARAMS.keys())}")
-    
-    params = CITY_PARAMS[city]
+    # Get city parameters (may trigger auto-analysis)
+    params = get_city_parameters(city)
     
     # Filter out transit trips from walks
     valid_walks = []
@@ -131,7 +129,7 @@ def analyze_walks(walks_gdf: gpd.GeoDataFrame, streets_gdf: gpd.GeoDataFrame, ci
         # 3. Only filter out extremely long distances
         if (avg_speed <= params['max_walking_speed'] * 1.5 and  # Allow 50% buffer for speed
             avg_speed >= params['min_walking_speed'] * 0.5 and  # Allow slower walking
-            distance <= 10000):  # Maximum realistic walking distance of 10 km
+            distance <= params.get('max_direct_distance', 10000)):  # Use configurable max distance
             valid_walks.append(walk)
     
     valid_walks_gdf = gpd.GeoDataFrame(valid_walks, crs=walks_gdf.crs)

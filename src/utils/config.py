@@ -1,9 +1,11 @@
 """
 Configuration settings for street coverage mapping.
 """
+import logging
+from pathlib import Path
 
-# City parameters
-CITY_PARAMS = {
+# Legacy city parameters for backwards compatibility
+LEGACY_CITY_PARAMS = {
     'new_york': {
         'buffer_distance': 5,  # meters
         'max_walking_speed': 3.0,  # m/s (10.8 km/h)
@@ -56,6 +58,44 @@ CITY_PARAMS = {
         ]
     }
 }
+
+def get_city_parameters(city_name: str):
+    """
+    Get parameters for any city, using auto-detection or legacy configs.
+    
+    Args:
+        city_name: Name of the city (can be any city worldwide)
+        
+    Returns:
+        Dict containing optimized parameters for the city
+    """
+    # Check if it's a legacy city with predefined parameters
+    if city_name.lower() in LEGACY_CITY_PARAMS:
+        logging.info(f"Using legacy parameters for {city_name}")
+        return LEGACY_CITY_PARAMS[city_name.lower()]
+    
+    # Use auto-detection for new cities
+    try:
+        from .city_analyzer import get_city_parameters as analyze_city
+        cache_dir = str(Path(PROCESSED_DATA_DIR) / 'city_cache')
+        return analyze_city(city_name, cache_dir)
+    except ImportError:
+        logging.error("City analyzer not available, falling back to default parameters")
+        return get_default_parameters()
+
+def get_default_parameters():
+    """Get default parameters for unknown cities."""
+    return {
+        'buffer_distance': 8,
+        'max_walking_speed': 3.0,
+        'min_walking_speed': 0.1,
+        'max_sinuosity': 4.0,
+        'max_direct_distance': 15000,
+        'bbox': None
+    }
+
+# For backwards compatibility
+CITY_PARAMS = LEGACY_CITY_PARAMS
 
 # File paths
 DATA_DIR = 'data'
